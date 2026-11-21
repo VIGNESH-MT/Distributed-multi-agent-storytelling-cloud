@@ -1,9 +1,11 @@
 ﻿fastapi
-uvicorn[standard]
+uvicorn
 langgraph
+langchain-google-genai
 sqlalchemy
 psycopg[binary]
 pydantic-settings
 httpx
 pytest
 pytest-asyncio
+alembic

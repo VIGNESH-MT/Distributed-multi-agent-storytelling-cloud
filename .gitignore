@@ -60,3 +60,9 @@ desktop.ini
 **/*secret*.yml
 **/*secrets*.yaml
 **/*secrets*.yml
+
+# Container image archives and temporary build bundles
+*.tar
+*.tar.gz
+*.tar.zst
+*.oci
