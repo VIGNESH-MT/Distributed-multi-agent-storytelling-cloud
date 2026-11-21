@@ -1,0 +1,62 @@
+﻿# Python environments
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+kubeconfig
+kubeconfig.*
+*-token*
+*token-transfer*
+*agent-token*
+
+# Kubernetes sensitive configuration
+**/secret.yaml
+**/secrets.yaml
+**/*secret*.local.yaml
+
+# Local databases and temporary files
+*.sqlite
+*.sqlite3
+*.db
+*.log
+*.tmp
+*.bak
+
+# Build and packaging output
+build/
+dist/
+*.egg-info/
+
+# Editors and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local infrastructure and runtime state
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Never publish Kubernetes Secret manifests
+**/*secret*.yaml
+**/*secret*.yml
+**/*secrets*.yaml
+**/*secrets*.yml
