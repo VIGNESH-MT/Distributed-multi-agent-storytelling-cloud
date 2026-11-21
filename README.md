@@ -1,13 +1,12 @@
-﻿# Consistency-Aware Distributed Multi-Agent Storytelling
+﻿# Distributed Multi-Agent Storytelling Cloud
+
+Consistency-aware distributed multi-agent storytelling system deployed on a private K3s cloud.
 
 Research implementation for CO4219/CO7219.
 
 ## Research question
 
-How do agent coordination and shared-state consistency
-mechanisms affect narrative coherence, throughput,
-latency and fault tolerance in a distributed multi-agent
-storytelling system?
+How do agent coordination and shared-state consistency mechanisms affect narrative coherence, throughput, latency and fault tolerance in a distributed multi-agent storytelling system?
 
 ## Research principles
 
@@ -33,7 +32,19 @@ storytelling system?
 - FastAPI
 - LangGraph
 
-## Status
+## Current implementation status
 
-Infrastructure foundation established.
-Application implementation not yet complete.
+The two-node K3s infrastructure foundation has been established. PostgreSQL has been deployed with persistent storage, and persistence across a PostgreSQL pod replacement has been verified.
+
+The FastAPI application currently provides an initial health-check endpoint. Multi-agent orchestration, distributed agent deployment, consistency experiments and performance evaluation remain under development.
+
+## Repository structure
+
+- `app/` — application source code
+- `requirements.in` — direct Python dependencies
+- `requirements.lock` — resolved dependency lock file
+- `VERSION` — project version
+
+## Research and evaluation
+
+The project will evaluate coordination and shared-state consistency mechanisms using repeatable workloads and measurements of narrative coherence, throughput, latency, conflict handling and fault tolerance.
