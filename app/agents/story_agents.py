@@ -1,11 +1,35 @@
-﻿from langchain_core.messages import HumanMessage, SystemMessage
+﻿"""Model-backed and mock implementations of the storytelling agents."""
+
+import logging
+import os
+
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.model import get_chat_model
+from app.agents.mock_story_agents import (
+    mock_character_agent,
+    mock_critic_agent,
+    mock_plot_agent,
+)
 from app.agents.schemas import (
     CharacterProposal,
     CriticEvaluation,
     PlotProposal,
 )
+
+logger = logging.getLogger(__name__)
+
+AGENT_PROVIDER = os.getenv(
+    "STORY_AGENT_PROVIDER",
+    "gemini",
+).strip().lower()
+
+if AGENT_PROVIDER not in {"gemini", "mock"}:
+    raise ValueError(
+        "STORY_AGENT_PROVIDER must be either 'gemini' or 'mock'."
+    )
+
+logger.info("STORY_AGENT_PROVIDER=%s", AGENT_PROVIDER)
 
 
 def _structured_model(schema):
@@ -18,7 +42,14 @@ def run_plot_agent(
     current_story: str,
     user_request: str,
 ) -> PlotProposal:
-    """Independently analyse the story and propose causal plot developments."""
+    """Analyse the story and propose causal plot developments."""
+
+    if AGENT_PROVIDER == "mock":
+        return mock_plot_agent(
+            story_title,
+            current_story,
+            user_request,
+        )
 
     model = _structured_model(PlotProposal)
 
@@ -53,6 +84,15 @@ def run_character_agent(
     revision_feedback: list[str] | None = None,
 ) -> CharacterProposal:
     """Develop character motivations, actions and dialogue."""
+
+    if AGENT_PROVIDER == "mock":
+        return mock_character_agent(
+            story_title,
+            current_story,
+            user_request,
+            plot,
+            revision_feedback,
+        )
 
     model = _structured_model(CharacterProposal)
 
@@ -91,6 +131,15 @@ def run_critic_agent(
     character: CharacterProposal,
 ) -> CriticEvaluation:
     """Evaluate narrative continuity, causality and proposal quality."""
+
+    if AGENT_PROVIDER == "mock":
+        return mock_critic_agent(
+            story_title,
+            current_story,
+            user_request,
+            plot,
+            character,
+        )
 
     model = _structured_model(CriticEvaluation)
 

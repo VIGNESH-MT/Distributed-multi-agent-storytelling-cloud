@@ -1,0 +1,9 @@
+spec:
+  template:
+    spec:
+      containers:
+      - name: character-agent
+        image: docker.io/library/storytelling-api:0.2.2
+        env:
+        - name: STORY_AGENT_PROVIDER
+          value: "mock"

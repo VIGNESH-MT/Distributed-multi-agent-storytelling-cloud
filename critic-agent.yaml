@@ -1,0 +1,83 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storytelling-critic-agent
+  namespace: storytelling
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storytelling-critic-agent
+  template:
+    metadata:
+      labels:
+        app: storytelling-critic-agent
+        app-role: storytelling-agent
+    spec:
+      containers:
+        - name: critic-agent
+          image: docker.io/library/storytelling-api:0.2.0
+          imagePullPolicy: Never
+          command:
+            - uvicorn
+            - app.agent_services.critic:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: storytelling-model-secret
+                  key: GEMINI_API_KEY
+          resources:
+            requests:
+              cpu: 20m
+              memory: 96Mi
+            limits:
+              cpu: 80m
+              memory: 192Mi
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storytelling-critic-agent
+  namespace: storytelling
+spec:
+  selector:
+    app: storytelling-critic-agent
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+  type: ClusterIP

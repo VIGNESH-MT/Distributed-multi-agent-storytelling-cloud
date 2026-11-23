@@ -1,11 +1,14 @@
-﻿
+﻿from pathlib import Path
+
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.api.routes.stories import router as stories_router
 
-APP_VERSION = "0.1.1"
+APP_VERSION = "0.1.2"
+STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 
 
 class HealthResponse(BaseModel):
@@ -26,10 +29,16 @@ app = FastAPI(
     version=APP_VERSION,
 )
 
+app.mount(
+    "/static",
+    StaticFiles(directory=STATIC_DIR),
+    name="static",
+)
+
 
 @app.get("/", include_in_schema=False)
-def root() -> RedirectResponse:
-    return RedirectResponse(url="/docs", status_code=307)
+def root() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health", response_model=HealthCheckResponse)

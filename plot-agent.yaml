@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storytelling-plot-agent
+  namespace: storytelling
+  labels:
+    app: storytelling-agent
+    component: plot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storytelling-agent
+      component: plot
+  template:
+    metadata:
+      labels:
+        app: storytelling-agent
+        component: plot
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app: storytelling-agent
+      containers:
+      - name: plot-agent
+        image: docker.io/library/storytelling-api:0.2.0
+        imagePullPolicy: Never
+        command:
+        - uvicorn
+        - app.agent_services.plot:app
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+        ports:
+        - name: http
+          containerPort: 8000
+        env:
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: storytelling-model-secret
+              key: GEMINI_API_KEY
+        resources:
+          requests:
+            cpu: 20m
+            memory: 96Mi
+          limits:
+            cpu: 80m
+            memory: 192Mi
+        startupProbe:
+          httpGet:
+            path: /health/live
+            port: http
+          periodSeconds: 5
+          failureThreshold: 12
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: http
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: http
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storytelling-plot-agent
+  namespace: storytelling
+spec:
+  type: ClusterIP
+  selector:
+    app: storytelling-agent
+    component: plot
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http

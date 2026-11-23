@@ -1,0 +1,212 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#10111a">
+    <meta name="description" content="Distributed multi-agent storytelling studio">
+    <title>Storytelling Studio</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-mark">S</div>
+            <div>
+                <strong>Storytelling</strong>
+                <span>PRIVATE CLOUD STUDIO</span>
+            </div>
+        </div>
+
+        <button id="newStoryButton" class="primary-button new-story">
+            <span>＋</span> New story
+        </button>
+
+        <div class="sidebar-heading">YOUR WORKSPACE</div>
+        <div id="storyList" class="story-list">
+            <p class="muted small">Your recently opened stories will appear here.</p>
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="cloud-indicator">
+                <span class="status-dot"></span>
+                <div>
+                    <strong>Cloud connected</strong>
+                    <small>Storytelling API</small>
+                </div>
+            </div>
+            <div class="sidebar-footer">CO4219 / CO7219 · Research project</div>
+        </div>
+    </aside>
+
+    <main class="main-area">
+        <header class="topbar">
+            <div>
+                <div class="eyebrow">DISTRIBUTED CREATIVE WORKSPACE</div>
+                <h1 id="pageHeading">Your story begins here.</h1>
+            </div>
+            <div class="top-actions">
+                <span id="connectionStatus" class="connection-pill">
+                    <span class="status-dot"></span> Connecting
+                </span>
+                <button id="refreshButton" class="icon-button" title="Refresh story">
+                    ↻
+                </button>
+            </div>
+        </header>
+
+        <section id="welcomePanel" class="welcome-panel">
+            <div class="welcome-label">YOUR CREATIVE WORKSPACE</div>
+            <h2>Ideas become stories.<br><span>Stories become worlds.</span></h2>
+            <p>
+                Create a story, collaborate with autonomous AI agents,
+                and develop a narrative through an evaluated revision workflow.
+            </p>
+            <button id="welcomeNewButton" class="primary-button">
+                Create your first story <span>→</span>
+            </button>
+            <div class="feature-row">
+                <div class="feature">
+                    <span class="feature-icon">01</span>
+                    <strong>Plot development</strong>
+                    <small>Explore narrative directions.</small>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">02</span>
+                    <strong>Character development</strong>
+                    <small>Build meaningful characters.</small>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">03</span>
+                    <strong>Critic evaluation</strong>
+                    <small>Evaluate continuity and logic.</small>
+                </div>
+            </div>
+        </section>
+
+        <section id="workspace" class="workspace hidden">
+            <div class="workspace-heading">
+                <div>
+                    <div class="eyebrow">CURRENT MANUSCRIPT</div>
+                    <h2 id="storyTitle">Untitled story</h2>
+                    <div class="story-meta">
+                        <span id="versionLabel">Version 1</span>
+                        <span>·</span>
+                        <span id="updatedLabel">Not yet updated</span>
+                    </div>
+                </div>
+                <span id="saveStatus" class="status-label">Ready</span>
+            </div>
+
+            <div class="editor-card">
+                <div class="editor-toolbar">
+                    <span>MANUSCRIPT EDITOR</span>
+                    <span>CANONICAL STORY CONTENT</span>
+                </div>
+                <textarea
+                    id="storyEditor"
+                    spellcheck="true"
+                    placeholder="Your story will appear here..."
+                    aria-label="Story manuscript"
+                ></textarea>
+                <div class="editor-footer">
+                    <span id="wordCount">0 words</span>
+                    <button id="saveButton" class="secondary-button">
+                        Save revision
+                    </button>
+                </div>
+            </div>
+
+            <div class="ai-card">
+                <div class="ai-heading">
+                    <div class="ai-icon">✦</div>
+                    <div>
+                        <h3>AI storytelling workflow</h3>
+                        <p>Generate, critique and commit a new narrative continuation.</p>
+                    </div>
+                </div>
+
+                <label for="userPrompt">YOUR CREATIVE DIRECTION</label>
+                <textarea
+                    id="userPrompt"
+                    class="prompt-input"
+                    maxlength="4000"
+                    placeholder="Describe what should happen next in your story..."
+                >Continue the story naturally. Introduce a meaningful development, deepen the characters, and preserve continuity with the existing narrative.</textarea>
+
+                <button id="generateButton" class="primary-button generate-button">
+                    <span>✦</span> Generate AI continuation
+                </button>
+
+                <div id="workflowResult" class="workflow-result hidden">
+                    <div class="result-heading">
+                        <h3>Workflow evaluation</h3>
+                        <span id="workflowStatus" class="status-label">Completed</span>
+                    </div>
+
+                    <div class="result-grid">
+                        <div class="result-metric">
+                            <span>CRITIC SCORE</span>
+                            <strong id="criticScore">—</strong>
+                            <small>Out of 100</small>
+                        </div>
+                        <div class="result-metric">
+                            <span>EVALUATIONS</span>
+                            <strong id="criticEvaluations">—</strong>
+                            <small>Critic passes</small>
+                        </div>
+                        <div class="result-metric">
+                            <span>REVISION ATTEMPTS</span>
+                            <strong id="revisionAttempts">—</strong>
+                            <small>Additional attempts</small>
+                        </div>
+                    </div>
+
+                    <div id="evaluationExplanation" class="evaluation-explanation"></div>
+                    <details>
+                        <summary>View execution provenance</summary>
+                        <pre id="provenance"></pre>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <div id="busyOverlay" class="busy-overlay hidden">
+            <div class="spinner"></div>
+            <strong id="busyTitle">Working on your story...</strong>
+            <p id="busyDescription">The AI storytelling workflow is running.</p>
+        </div>
+    </main>
+</div>
+
+<dialog id="createDialog" class="create-dialog">
+    <form id="createForm">
+        <div class="dialog-heading">
+            <div>
+                <div class="eyebrow">NEW PROJECT</div>
+                <h2>Create a story</h2>
+            </div>
+            <button type="button" id="closeDialogButton" class="icon-button">×</button>
+        </div>
+
+        <label for="newTitle">STORY TITLE</label>
+        <input id="newTitle" type="text" maxlength="200"
+               placeholder="The observatory mystery" required>
+
+        <label for="initialContent">OPENING PREMISE</label>
+        <textarea id="initialContent" placeholder="Introduce your story world..."></textarea>
+
+        <button type="submit" class="primary-button full-width">
+            Create story →
+        </button>
+    </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="/static/app.js" defer></script>
+</body>
+</html>
+

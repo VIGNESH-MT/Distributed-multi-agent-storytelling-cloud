@@ -1,4 +1,7 @@
-﻿from typing import Literal, TypedDict
+﻿"""LangGraph orchestration for local or distributed storytelling agents."""
+
+import os
+from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -13,8 +16,17 @@ from app.agents.story_agents import (
     run_plot_agent,
 )
 
-
 MAX_REVISION_ATTEMPTS = 2
+
+AGENT_EXECUTION_MODE = os.getenv(
+    "AGENT_EXECUTION_MODE",
+    "local",
+).strip().lower()
+
+if AGENT_EXECUTION_MODE not in {"local", "remote"}:
+    raise ValueError(
+        "AGENT_EXECUTION_MODE must be either 'local' or 'remote'."
+    )
 
 
 class StoryWorkflowState(TypedDict):
@@ -33,11 +45,20 @@ class StoryWorkflowState(TypedDict):
 
 
 def plot_node(state: StoryWorkflowState) -> dict:
-    proposal = run_plot_agent(
-        story_title=state["story_title"],
-        current_story=state["current_story"],
-        user_request=state["user_request"],
-    )
+    if AGENT_EXECUTION_MODE == "remote":
+        from app.agents.remote_agents import call_plot_agent
+
+        proposal = call_plot_agent(
+            story_title=state["story_title"],
+            current_story=state["current_story"],
+            user_request=state["user_request"],
+        )
+    else:
+        proposal = run_plot_agent(
+            story_title=state["story_title"],
+            current_story=state["current_story"],
+            user_request=state["user_request"],
+        )
 
     return {
         "plot_proposal": proposal,
@@ -46,13 +67,29 @@ def plot_node(state: StoryWorkflowState) -> dict:
 
 
 def character_node(state: StoryWorkflowState) -> dict:
-    proposal = run_character_agent(
-        story_title=state["story_title"],
-        current_story=state["current_story"],
-        user_request=state["user_request"],
-        plot=state["plot_proposal"],
-        revision_feedback=state["revision_feedback"],
-    )
+    plot = state["plot_proposal"]
+
+    if plot is None:
+        raise RuntimeError("Character Agent requires a plot proposal.")
+
+    if AGENT_EXECUTION_MODE == "remote":
+        from app.agents.remote_agents import call_character_agent
+
+        proposal = call_character_agent(
+            story_title=state["story_title"],
+            current_story=state["current_story"],
+            user_request=state["user_request"],
+            plot=plot,
+            revision_feedback=state["revision_feedback"],
+        )
+    else:
+        proposal = run_character_agent(
+            story_title=state["story_title"],
+            current_story=state["current_story"],
+            user_request=state["user_request"],
+            plot=plot,
+            revision_feedback=state["revision_feedback"],
+        )
 
     return {
         "character_proposal": proposal,
@@ -61,13 +98,32 @@ def character_node(state: StoryWorkflowState) -> dict:
 
 
 def critic_node(state: StoryWorkflowState) -> dict:
-    evaluation = run_critic_agent(
-        story_title=state["story_title"],
-        current_story=state["current_story"],
-        user_request=state["user_request"],
-        plot=state["plot_proposal"],
-        character=state["character_proposal"],
-    )
+    plot = state["plot_proposal"]
+    character = state["character_proposal"]
+
+    if plot is None or character is None:
+        raise RuntimeError(
+            "Critic Agent requires both plot and character proposals."
+        )
+
+    if AGENT_EXECUTION_MODE == "remote":
+        from app.agents.remote_agents import call_critic_agent
+
+        evaluation = call_critic_agent(
+            story_title=state["story_title"],
+            current_story=state["current_story"],
+            user_request=state["user_request"],
+            plot=plot,
+            character=character,
+        )
+    else:
+        evaluation = run_critic_agent(
+            story_title=state["story_title"],
+            current_story=state["current_story"],
+            user_request=state["user_request"],
+            plot=plot,
+            character=character,
+        )
 
     evaluations = state["critic_evaluations"] + 1
     revisions = state["revision_attempts"]
@@ -106,7 +162,7 @@ def route_after_critic(
 
 
 def build_story_graph():
-    """Build a bounded proposal, critique and revision workflow."""
+    """Build the bounded proposal, critique and revision workflow."""
 
     builder = StateGraph(StoryWorkflowState)
 
@@ -139,7 +195,7 @@ def run_story_workflow(
     current_story: str,
     user_request: str,
 ) -> StoryWorkflowState:
-    """Run the multi-agent workflow for one storytelling request."""
+    """Run one complete storytelling workflow."""
 
     initial_state: StoryWorkflowState = {
         "story_title": story_title,

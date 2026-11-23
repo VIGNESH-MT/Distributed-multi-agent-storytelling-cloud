@@ -5,12 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
 
-class Settings(BaseSettings):
-    postgres_host: str = "127.0.0.1"
-    postgres_port: int = 15432
-    postgres_db: str = "storytelling"
-    postgres_user: str = "storyapp"
-    postgres_password: SecretStr
+class ModelSettings(BaseSettings):
+    """Configuration required by language-model-backed agents."""
 
     gemini_api_key: SecretStr | None = None
     gemini_model: str = "gemini-3.6-flash"
@@ -20,6 +16,16 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+
+class Settings(ModelSettings):
+    """Full application configuration, including database access."""
+
+    postgres_host: str = "127.0.0.1"
+    postgres_port: int = 15432
+    postgres_db: str = "storytelling"
+    postgres_user: str = "storyapp"
+    postgres_password: SecretStr
 
     @property
     def database_url(self) -> URL:
@@ -34,5 +40,12 @@ class Settings(BaseSettings):
 
 
 @lru_cache
+def get_model_settings() -> ModelSettings:
+    """Return cached model-only configuration."""
+    return ModelSettings()
+
+
+@lru_cache
 def get_settings() -> Settings:
+    """Return cached full application configuration."""
     return Settings()
