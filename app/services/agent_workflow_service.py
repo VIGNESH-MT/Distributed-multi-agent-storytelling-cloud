@@ -3,6 +3,9 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from pydantic import ValidationError
+
+from app.agents.provenance import AgentExecutionTrace
 from app.agents.graph import run_story_workflow
 from app.db.models import Story
 from app.services.story_service import (
@@ -60,18 +63,53 @@ def execute_agentic_revision(
 
     critic = result["critic_evaluation"]
 
+    # Validate execution evidence independently at the persistence boundary.
+    expected_agents = ["plot"] + (
+        ["character", "critic"] * result["critic_evaluations"]
+    )
+
+    try:
+        validated_traces = [
+            AgentExecutionTrace.model_validate(trace)
+            for trace in result.get("agent_traces", [])
+        ]
+        observed_agents = [
+            trace.agent for trace in validated_traces
+        ]
+        trace_complete = (
+            result.get("trace_coverage") == "complete"
+            and observed_agents == expected_agents
+            and result["revision_attempts"]
+            == result["critic_evaluations"] - 1
+        )
+    except (ValidationError, TypeError, ValueError):
+        validated_traces = []
+        trace_complete = False
+
     provenance = {
         "workflow": "langgraph_proposal_critique_revision",
-        "model": "gemini-3.6-flash",
         "base_version": expected_version,
         "critic_evaluations": result["critic_evaluations"],
         "revision_attempts": result["revision_attempts"],
+        "trace_coverage": (
+            "complete" if trace_complete else "incomplete"
+        ),
+        "agent_traces": [
+            trace.model_dump(mode="json")
+            for trace in validated_traces
+        ],
         "critic_evaluation": critic.model_dump(mode="json"),
         "plot_proposal": result["plot_proposal"].model_dump(mode="json"),
         "character_proposal": result["character_proposal"].model_dump(
             mode="json"
         ),
     }
+
+    if result["workflow_status"] == "approved" and not trace_complete:
+        raise ValueError(
+            "Approved revision cannot be committed because "
+            "execution provenance is incomplete."
+        )
 
     if result["workflow_status"] != "approved":
         return {
@@ -119,3 +157,5 @@ def execute_agentic_revision(
         "revision_attempts": result["revision_attempts"],
         "provenance": provenance,
     }
+
+

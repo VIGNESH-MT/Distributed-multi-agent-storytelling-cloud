@@ -4,6 +4,8 @@ import os
 
 import httpx
 
+from app.agent_services.common import AgentExecutionResponse
+from app.agents.provenance import AgentExecutionTrace
 from app.agents.schemas import (
     CharacterProposal,
     CriticEvaluation,
@@ -51,13 +53,37 @@ def _post_agent(
         ) from exc
 
 
+def _parse_agent_response(
+    *,
+    response: dict,
+    result_type: type,
+    expected_agent: str,
+):
+    """Validate a remote result and its execution provenance."""
+
+    envelope = AgentExecutionResponse[result_type].model_validate(response)
+    trace = envelope.trace
+
+    if trace.agent != expected_agent:
+        raise ValueError(
+            f"Expected {expected_agent} trace, received {trace.agent}."
+        )
+
+    if trace.execution_location != "remote":
+        raise ValueError(
+            "Remote agent returned an invalid execution location."
+        )
+
+    return envelope.result, trace
+
+
 def call_plot_agent(
     *,
     story_title: str,
     current_story: str,
     user_request: str,
-) -> PlotProposal:
-    result = _post_agent(
+) -> tuple[PlotProposal, AgentExecutionTrace]:
+    response = _post_agent(
         base_url=PLOT_AGENT_URL,
         endpoint="/propose",
         payload={
@@ -66,7 +92,12 @@ def call_plot_agent(
             "user_request": user_request,
         },
     )
-    return PlotProposal.model_validate(result)
+
+    return _parse_agent_response(
+        response=response,
+        result_type=PlotProposal,
+        expected_agent="plot",
+    )
 
 
 def call_character_agent(
@@ -76,8 +107,8 @@ def call_character_agent(
     user_request: str,
     plot: PlotProposal,
     revision_feedback: list[str] | None = None,
-) -> CharacterProposal:
-    result = _post_agent(
+) -> tuple[CharacterProposal, AgentExecutionTrace]:
+    response = _post_agent(
         base_url=CHARACTER_AGENT_URL,
         endpoint="/propose",
         payload={
@@ -88,7 +119,12 @@ def call_character_agent(
             "revision_feedback": revision_feedback or [],
         },
     )
-    return CharacterProposal.model_validate(result)
+
+    return _parse_agent_response(
+        response=response,
+        result_type=CharacterProposal,
+        expected_agent="character",
+    )
 
 
 def call_critic_agent(
@@ -98,8 +134,8 @@ def call_critic_agent(
     user_request: str,
     plot: PlotProposal,
     character: CharacterProposal,
-) -> CriticEvaluation:
-    result = _post_agent(
+) -> tuple[CriticEvaluation, AgentExecutionTrace]:
+    response = _post_agent(
         base_url=CRITIC_AGENT_URL,
         endpoint="/evaluate",
         payload={
@@ -110,4 +146,9 @@ def call_critic_agent(
             "character": character.model_dump(mode="json"),
         },
     )
-    return CriticEvaluation.model_validate(result)
+
+    return _parse_agent_response(
+        response=response,
+        result_type=CriticEvaluation,
+        expected_agent="critic",
+    )

@@ -1,4 +1,4 @@
-﻿"""Deterministic mock agents for infrastructure and integration testing.
+"""Deterministic mock agents for infrastructure and integration testing.
 
 These functions do not call an LLM and must not be used to measure
 semantic narrative quality.
@@ -66,45 +66,40 @@ def mock_character_agent(
     revision_feedback: list[str] | None = None,
 ) -> CharacterProposal:
     logger.warning(
-        "MOCK_PROVIDER=mock: deterministic Character Agent fixture; "
+        "MOCK_PROVIDER=mock: deterministic context-aware Character Agent; "
         "no LLM call."
     )
 
-    return CharacterProposal(
-        character_developments=[
-            (
-                "The lead investigator becomes more methodical and insists "
-                "on independent verification before accepting an explanation."
-            ),
-            (
-                "The systems engineer moves from immediate fault correction "
-                "towards preserving evidence and testing competing explanations."
-            ),
-        ],
-        dialogue=[
-            (
-                'Investigator: "We need independent evidence before '
-                'we decide what this means."'
-            ),
-            (
-                'Engineer: "I will isolate the subsystem and record '
-                'each observation."'
-            ),
-        ],
-        motivations=[
-            "The investigator wants a reliable explanation supported by evidence.",
-            "The engineer wants to identify the anomaly without destroying evidence.",
-        ],
-        proposed_story_continuation=(
-            "The investigator and engineer agree to preserve the original "
-            "measurements while conducting an independent observation. "
-            "They document their predictions in advance and separate the "
-            "test equipment from the affected subsystem. This approach "
-            "allows them to compare the eventual observation with the "
-            "recorded prediction without relying on the original instrument."
-        ),
+    events = [
+        event.strip()
+        for event in plot.proposed_events
+        if event.strip()
+    ]
+
+    dialogue = (
+        '"We need to examine the evidence before deciding what it means," '
+        "one character said."
     )
 
+    continuation_parts = events + [dialogue]
+
+    if revision_feedback:
+        continuation_parts.append(
+            "The investigators reconsidered the evidence carefully "
+            "before deciding how to proceed."
+        )
+
+    return CharacterProposal(
+        character_developments=[
+            "The characters respond to the unfolding events "
+            "by examining the available evidence."
+        ],
+        dialogue=[dialogue],
+        motivations=[
+            f"The characters seek to resolve: {plot.central_conflict}"
+        ],
+        proposed_story_continuation=" ".join(continuation_parts),
+    )
 
 def mock_critic_agent(
     story_title: str,

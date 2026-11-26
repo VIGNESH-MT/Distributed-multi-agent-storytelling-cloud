@@ -5,12 +5,18 @@ from typing import Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from app.agents.provenance import (
+    AgentExecutionTrace,
+    execute_agent_with_trace,
+)
+from pydantic import ValidationError
 from app.agents.schemas import (
     CharacterProposal,
     CriticEvaluation,
     PlotProposal,
 )
 from app.agents.story_agents import (
+    AGENT_PROVIDER,
     run_character_agent,
     run_critic_agent,
     run_plot_agent,
@@ -43,25 +49,38 @@ class StoryWorkflowState(TypedDict):
     critic_evaluations: int
     workflow_status: str
 
+    agent_traces: list[dict]
+    trace_coverage: Literal["pending", "complete", "incomplete"]
+
 
 def plot_node(state: StoryWorkflowState) -> dict:
+    traces = state.get("agent_traces", [])
+
     if AGENT_EXECUTION_MODE == "remote":
         from app.agents.remote_agents import call_plot_agent
 
-        proposal = call_plot_agent(
+        proposal, trace = call_plot_agent(
             story_title=state["story_title"],
             current_story=state["current_story"],
             user_request=state["user_request"],
         )
+        traces = [*traces, trace.model_dump(mode="json")]
     else:
-        proposal = run_plot_agent(
-            story_title=state["story_title"],
-            current_story=state["current_story"],
-            user_request=state["user_request"],
+        proposal, trace = execute_agent_with_trace(
+            agent="plot",
+            provider=AGENT_PROVIDER,
+            execution_location="local",
+            operation=lambda: run_plot_agent(
+                story_title=state["story_title"],
+                current_story=state["current_story"],
+                user_request=state["user_request"],
+            ),
         )
+        traces = [*traces, trace.model_dump(mode="json")]
 
     return {
         "plot_proposal": proposal,
+        "agent_traces": traces,
         "workflow_status": "plot_proposed",
     }
 
@@ -72,27 +91,37 @@ def character_node(state: StoryWorkflowState) -> dict:
     if plot is None:
         raise RuntimeError("Character Agent requires a plot proposal.")
 
+    traces = state.get("agent_traces", [])
+
     if AGENT_EXECUTION_MODE == "remote":
         from app.agents.remote_agents import call_character_agent
 
-        proposal = call_character_agent(
+        proposal, trace = call_character_agent(
             story_title=state["story_title"],
             current_story=state["current_story"],
             user_request=state["user_request"],
             plot=plot,
             revision_feedback=state["revision_feedback"],
         )
+        traces = [*traces, trace.model_dump(mode="json")]
     else:
-        proposal = run_character_agent(
-            story_title=state["story_title"],
-            current_story=state["current_story"],
-            user_request=state["user_request"],
-            plot=plot,
-            revision_feedback=state["revision_feedback"],
+        proposal, trace = execute_agent_with_trace(
+            agent="character",
+            provider=AGENT_PROVIDER,
+            execution_location="local",
+            operation=lambda: run_character_agent(
+                story_title=state["story_title"],
+                current_story=state["current_story"],
+                user_request=state["user_request"],
+                plot=plot,
+                revision_feedback=state["revision_feedback"],
+            ),
         )
+        traces = [*traces, trace.model_dump(mode="json")]
 
     return {
         "character_proposal": proposal,
+        "agent_traces": traces,
         "workflow_status": "character_proposed",
     }
 
@@ -106,24 +135,33 @@ def critic_node(state: StoryWorkflowState) -> dict:
             "Critic Agent requires both plot and character proposals."
         )
 
+    traces = state.get("agent_traces", [])
+
     if AGENT_EXECUTION_MODE == "remote":
         from app.agents.remote_agents import call_critic_agent
 
-        evaluation = call_critic_agent(
+        evaluation, trace = call_critic_agent(
             story_title=state["story_title"],
             current_story=state["current_story"],
             user_request=state["user_request"],
             plot=plot,
             character=character,
         )
+        traces = [*traces, trace.model_dump(mode="json")]
     else:
-        evaluation = run_critic_agent(
-            story_title=state["story_title"],
-            current_story=state["current_story"],
-            user_request=state["user_request"],
-            plot=plot,
-            character=character,
+        evaluation, trace = execute_agent_with_trace(
+            agent="critic",
+            provider=AGENT_PROVIDER,
+            execution_location="local",
+            operation=lambda: run_critic_agent(
+                story_title=state["story_title"],
+                current_story=state["current_story"],
+                user_request=state["user_request"],
+                plot=plot,
+                character=character,
+            ),
         )
+        traces = [*traces, trace.model_dump(mode="json")]
 
     evaluations = state["critic_evaluations"] + 1
     revisions = state["revision_attempts"]
@@ -148,7 +186,35 @@ def critic_node(state: StoryWorkflowState) -> dict:
         "critic_evaluations": evaluations,
         "revision_attempts": revisions,
         "revision_feedback": feedback,
+        "agent_traces": traces,
         "workflow_status": status,
+    }
+
+
+def finalize_trace_coverage(state: StoryWorkflowState) -> dict:
+    """Validate that every expected agent execution has a valid trace."""
+
+    expected_agents = ["plot"] + (
+        ["character", "critic"] * state["critic_evaluations"]
+    )
+
+    try:
+        validated_traces = [
+            AgentExecutionTrace.model_validate(trace)
+            for trace in state.get("agent_traces", [])
+        ]
+
+        observed_agents = [
+            trace.agent for trace in validated_traces
+        ]
+
+        complete = observed_agents == expected_agents
+
+    except (ValidationError, TypeError, ValueError):
+        complete = False
+
+    return {
+        "trace_coverage": "complete" if complete else "incomplete"
     }
 
 
@@ -169,6 +235,7 @@ def build_story_graph():
     builder.add_node("plot", plot_node)
     builder.add_node("character", character_node)
     builder.add_node("critic", critic_node)
+    builder.add_node("finalize", finalize_trace_coverage)
 
     builder.add_edge(START, "plot")
     builder.add_edge("plot", "character")
@@ -179,9 +246,11 @@ def build_story_graph():
         route_after_critic,
         {
             "revise": "character",
-            "finish": END,
+            "finish": "finalize",
         },
     )
+
+    builder.add_edge("finalize", END)
 
     return builder.compile()
 
@@ -208,6 +277,11 @@ def run_story_workflow(
         "revision_attempts": 0,
         "critic_evaluations": 0,
         "workflow_status": "started",
+        "agent_traces": [],
+        "trace_coverage": "pending",
     }
 
     return story_graph.invoke(initial_state)
+
+
+

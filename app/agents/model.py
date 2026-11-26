@@ -8,7 +8,7 @@ from app.core.config import get_model_settings
 
 
 def extract_text(message: BaseMessage) -> str:
-    """Extract readable text from LangChain message content."""
+    """Extract readable text from a LangChain response."""
     content: Any = message.content
 
     if isinstance(content, str):
@@ -23,7 +23,9 @@ def extract_text(message: BaseMessage) -> str:
             elif isinstance(block, dict) and block.get("type") == "text":
                 text_parts.append(block.get("text", ""))
 
-        return "\n".join(part for part in text_parts if part).strip()
+        return "\n".join(
+            part for part in text_parts if part
+        ).strip()
 
     return str(content).strip()
 
@@ -48,14 +50,16 @@ def get_chat_model() -> ChatGoogleGenerativeAI:
 
 
 def invoke_model(prompt: str) -> str:
-    """Invoke Gemini and return normalized text."""
-    if not prompt.strip():
+    """Invoke Gemini and return normalized generated text."""
+    if not prompt or not prompt.strip():
         raise ValueError("The model prompt cannot be empty.")
 
     response = get_chat_model().invoke(prompt)
     result = extract_text(response)
 
     if not result:
-        raise RuntimeError("Gemini returned an empty text response.")
+        raise RuntimeError(
+            "Gemini returned an empty text response."
+        )
 
     return result

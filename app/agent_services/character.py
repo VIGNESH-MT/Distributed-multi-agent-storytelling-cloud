@@ -5,7 +5,11 @@ import logging
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from app.agent_services.common import create_agent_app
+from app.agent_services.common import (
+    AgentExecutionResponse,
+    create_agent_app,
+    execute_remote_agent,
+)
 from app.agents.schemas import CharacterProposal, PlotProposal
 from app.agents.story_agents import run_character_agent
 
@@ -21,15 +25,23 @@ class CharacterRequest(BaseModel):
     revision_feedback: list[str] = Field(default_factory=list)
 
 
-@app.post("/propose", response_model=CharacterProposal)
-def propose_characters(request: CharacterRequest) -> CharacterProposal:
+@app.post(
+    "/propose",
+    response_model=AgentExecutionResponse[CharacterProposal],
+)
+def propose_characters(
+    request: CharacterRequest,
+) -> AgentExecutionResponse[CharacterProposal]:
     try:
-        return run_character_agent(
-            story_title=request.story_title,
-            current_story=request.current_story,
-            user_request=request.user_request,
-            plot=request.plot,
-            revision_feedback=request.revision_feedback,
+        return execute_remote_agent(
+            agent="character",
+            operation=lambda: run_character_agent(
+                story_title=request.story_title,
+                current_story=request.current_story,
+                user_request=request.user_request,
+                plot=request.plot,
+                revision_feedback=request.revision_feedback,
+            ),
         )
     except Exception as exc:
         logger.exception("Character Agent inference failed")
