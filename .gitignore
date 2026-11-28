@@ -51,6 +51,8 @@ Thumbs.db
 desktop.ini
 
 # Local infrastructure and runtime state
+scripts/gcp/config.env
+scripts/gcp/.image
 .terraform/
 *.tfstate
 *.tfstate.*

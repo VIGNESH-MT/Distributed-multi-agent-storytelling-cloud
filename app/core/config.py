@@ -26,6 +26,11 @@ class Settings(ModelSettings):
     postgres_db: str = "storytelling"
     postgres_user: str = "storyapp"
     postgres_password: SecretStr
+    postgres_sslmode: str | None = None
+
+    db_pool_size: int = 5
+    db_max_overflow: int = 5
+    db_pool_recycle_seconds: int = 1800
 
     @property
     def database_url(self) -> URL:
@@ -36,6 +41,11 @@ class Settings(ModelSettings):
             host=self.postgres_host,
             port=self.postgres_port,
             database=self.postgres_db,
+            query=(
+                {"sslmode": self.postgres_sslmode}
+                if self.postgres_sslmode
+                else {}
+            ),
         )
 
 

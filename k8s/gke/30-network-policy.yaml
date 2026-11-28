@@ -1,0 +1,21 @@
+# Agents are internal services: only the API (the LangGraph coordinator)
+# may call them. Requires GKE Dataplane V2 (enabled by 01-provision.sh).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agents-accept-api-only
+  namespace: storytelling
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: agent
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: storytelling-api
+      ports:
+        - protocol: TCP
+          port: 8000

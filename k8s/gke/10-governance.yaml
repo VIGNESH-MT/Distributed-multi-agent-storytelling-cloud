@@ -1,0 +1,32 @@
+# Upper bounds sized for: API up to 4 replicas, each agent up to 4 replicas,
+# one migration Job, plus headroom for rolling-update surge pods.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: storytelling-quota
+  namespace: storytelling
+spec:
+  hard:
+    pods: "30"
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "12"
+    limits.memory: 12Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: storytelling-limits
+  namespace: storytelling
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: 500m
+        memory: 512Mi
+      max:
+        cpu: "2"
+        memory: 2Gi

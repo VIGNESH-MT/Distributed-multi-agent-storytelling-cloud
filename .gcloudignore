@@ -1,0 +1,14 @@
+# Files never uploaded to Cloud Build (the image only needs app/, migrations/,
+# alembic.ini, requirements.lock and Containerfile).
+.gcloudignore
+.git
+.gitignore
+#!include:.gitignore
+
+tests/
+scripts/
+k8s/
+docs/
+*.md
+*.yaml
+!cloudbuild.yaml

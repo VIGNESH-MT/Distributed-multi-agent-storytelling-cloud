@@ -1,0 +1,26 @@
+# Values wrapped in __DOUBLE_UNDERSCORES__ are filled in by scripts/gcp/03-deploy.sh.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storytelling-config
+  namespace: storytelling
+data:
+  POSTGRES_HOST: "__DB_HOST__"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "__DB_NAME__"
+  POSTGRES_SSLMODE: "require"
+  # Cloud SQL connection budget: API max replicas x (pool + overflow) must stay
+  # below the instance's max_connections.
+  DB_POOL_SIZE: "3"
+  DB_MAX_OVERFLOW: "2"
+
+  AGENT_EXECUTION_MODE: "remote"
+  PLOT_AGENT_URL: "http://storytelling-plot-agent:8000"
+  CHARACTER_AGENT_URL: "http://storytelling-character-agent:8000"
+  CRITIC_AGENT_URL: "http://storytelling-critic-agent:8000"
+  AGENT_REQUEST_TIMEOUT_SECONDS: "240"
+  AGENT_CONNECT_RETRIES: "2"
+
+  STORY_AGENT_PROVIDER: "__AGENT_PROVIDER__"
+  GEMINI_MODEL: "__GEMINI_MODEL__"
+  MOCK_AGENT_CPU_MS: "__MOCK_AGENT_CPU_MS__"

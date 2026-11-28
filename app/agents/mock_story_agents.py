@@ -2,9 +2,15 @@
 
 These functions do not call an LLM and must not be used to measure
 semantic narrative quality.
+
+MOCK_AGENT_CPU_MS optionally makes each mock call consume that much CPU
+time, so autoscaling and throughput experiments generate a measurable
+synthetic load. Results obtained this way must be reported as synthetic.
 """
 
 import logging
+import os
+import time
 
 from app.agents.schemas import (
     CharacterProposal,
@@ -15,6 +21,22 @@ from app.agents.schemas import (
 logger = logging.getLogger(__name__)
 
 
+def _simulate_inference_cost() -> None:
+    try:
+        budget_ms = int(os.getenv("MOCK_AGENT_CPU_MS", "0") or 0)
+    except ValueError:
+        budget_ms = 0
+
+    if budget_ms <= 0:
+        return
+
+    deadline = time.perf_counter() + budget_ms / 1000
+    value = 0
+
+    while time.perf_counter() < deadline:
+        value = (value * 31 + 7) % 1_000_003
+
+
 def mock_plot_agent(
     story_title: str,
     current_story: str,
@@ -23,6 +45,7 @@ def mock_plot_agent(
     logger.warning(
         "MOCK_PROVIDER=mock: deterministic Plot Agent fixture; no LLM call."
     )
+    _simulate_inference_cost()
 
     return PlotProposal(
         central_conflict=(
@@ -69,6 +92,7 @@ def mock_character_agent(
         "MOCK_PROVIDER=mock: deterministic context-aware Character Agent; "
         "no LLM call."
     )
+    _simulate_inference_cost()
 
     events = [
         event.strip()
@@ -112,6 +136,7 @@ def mock_critic_agent(
         "MOCK_PROVIDER=mock: deterministic structural Critic checks; "
         "no LLM evaluation."
     )
+    _simulate_inference_cost()
 
     checks = {
         "plot_events_present": len(plot.proposed_events) >= 2,

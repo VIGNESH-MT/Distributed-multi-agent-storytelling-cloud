@@ -1,0 +1,64 @@
+# Applies Alembic migrations to Cloud SQL. Jobs are immutable, so
+# 03-deploy.sh deletes and recreates this Job on every deployment.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: storytelling-migrate
+  namespace: storytelling
+  labels:
+    app.kubernetes.io/name: storytelling-migrate
+    app.kubernetes.io/part-of: storytelling
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: storytelling-migrate
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: __IMAGE__
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: storytelling-config
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: storytelling-db-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: storytelling-db-credentials
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi

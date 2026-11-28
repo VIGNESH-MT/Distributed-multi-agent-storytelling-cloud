@@ -1,0 +1,516 @@
+# Three independently deployed and independently scaled agent services.
+# Each agent: Deployment + ClusterIP Service + HorizontalPodAutoscaler
+# + PodDisruptionBudget. Replicas are spread across zones and nodes.
+#
+# Replica count is owned by the HPA, so Deployments intentionally omit
+# spec.replicas (re-applying the manifest must not reset a scaled workload).
+
+# ---------------------------------------------------------------- Plot Agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storytelling-plot-agent
+  namespace: storytelling
+  labels:
+    app.kubernetes.io/name: storytelling-plot-agent
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: storytelling
+spec:
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: storytelling-plot-agent
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: storytelling-plot-agent
+        app.kubernetes.io/component: agent
+        app.kubernetes.io/part-of: storytelling
+      annotations:
+        storytelling/config-hash: "__CONFIG_HASH__"
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 270
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: storytelling-plot-agent
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: storytelling-plot-agent
+      containers:
+        - name: agent
+          image: __IMAGE__
+          command:
+            - uvicorn
+            - app.agent_services.plot:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --timeout-graceful-shutdown
+            - "240"
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: storytelling-config
+          env:
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: storytelling-model-secret
+                  key: GEMINI_API_KEY
+                  optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storytelling-plot-agent
+  namespace: storytelling
+  labels:
+    app.kubernetes.io/name: storytelling-plot-agent
+    app.kubernetes.io/component: agent
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: storytelling-plot-agent
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: storytelling-plot-agent
+  namespace: storytelling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: storytelling-plot-agent
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: storytelling-plot-agent
+  namespace: storytelling
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: storytelling-plot-agent
+---
+# ----------------------------------------------------------- Character Agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storytelling-character-agent
+  namespace: storytelling
+  labels:
+    app.kubernetes.io/name: storytelling-character-agent
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: storytelling
+spec:
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: storytelling-character-agent
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: storytelling-character-agent
+        app.kubernetes.io/component: agent
+        app.kubernetes.io/part-of: storytelling
+      annotations:
+        storytelling/config-hash: "__CONFIG_HASH__"
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 270
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: storytelling-character-agent
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: storytelling-character-agent
+      containers:
+        - name: agent
+          image: __IMAGE__
+          command:
+            - uvicorn
+            - app.agent_services.character:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --timeout-graceful-shutdown
+            - "240"
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: storytelling-config
+          env:
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: storytelling-model-secret
+                  key: GEMINI_API_KEY
+                  optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storytelling-character-agent
+  namespace: storytelling
+  labels:
+    app.kubernetes.io/name: storytelling-character-agent
+    app.kubernetes.io/component: agent
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: storytelling-character-agent
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: storytelling-character-agent
+  namespace: storytelling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: storytelling-character-agent
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: storytelling-character-agent
+  namespace: storytelling
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: storytelling-character-agent
+---
+# -------------------------------------------------------------- Critic Agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storytelling-critic-agent
+  namespace: storytelling
+  labels:
+    app.kubernetes.io/name: storytelling-critic-agent
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: storytelling
+spec:
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: storytelling-critic-agent
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: storytelling-critic-agent
+        app.kubernetes.io/component: agent
+        app.kubernetes.io/part-of: storytelling
+      annotations:
+        storytelling/config-hash: "__CONFIG_HASH__"
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 270
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: storytelling-critic-agent
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: storytelling-critic-agent
+      containers:
+        - name: agent
+          image: __IMAGE__
+          command:
+            - uvicorn
+            - app.agent_services.critic:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+            - --timeout-graceful-shutdown
+            - "240"
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: storytelling-config
+          env:
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: storytelling-model-secret
+                  key: GEMINI_API_KEY
+                  optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storytelling-critic-agent
+  namespace: storytelling
+  labels:
+    app.kubernetes.io/name: storytelling-critic-agent
+    app.kubernetes.io/component: agent
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: storytelling-critic-agent
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: storytelling-critic-agent
+  namespace: storytelling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: storytelling-critic-agent
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 120
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: storytelling-critic-agent
+  namespace: storytelling
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: storytelling-critic-agent

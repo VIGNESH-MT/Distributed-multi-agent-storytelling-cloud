@@ -28,6 +28,14 @@ CRITIC_AGENT_URL = os.getenv(
     "http://storytelling-critic-agent:8000",
 ).rstrip("/")
 
+AGENT_REQUEST_TIMEOUT_SECONDS = float(
+    os.getenv("AGENT_REQUEST_TIMEOUT_SECONDS", "240")
+)
+
+# Only failed connection attempts are retried (e.g. a pod being replaced
+# during scaling or a rolling update); requests that reached an agent are not.
+AGENT_CONNECT_RETRIES = int(os.getenv("AGENT_CONNECT_RETRIES", "2"))
+
 
 def _post_agent(
     *,
@@ -37,10 +45,11 @@ def _post_agent(
 ) -> dict:
     """Call one agent service with bounded connection and response timeouts."""
 
-    timeout = httpx.Timeout(240.0, connect=5.0)
+    timeout = httpx.Timeout(AGENT_REQUEST_TIMEOUT_SECONDS, connect=5.0)
+    transport = httpx.HTTPTransport(retries=AGENT_CONNECT_RETRIES)
 
     try:
-        with httpx.Client(timeout=timeout) as client:
+        with httpx.Client(timeout=timeout, transport=transport) as client:
             response = client.post(
                 f"{base_url}{endpoint}",
                 json=payload,

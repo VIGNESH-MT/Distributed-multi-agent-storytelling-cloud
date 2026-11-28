@@ -1,0 +1,16 @@
+# Global external Application Load Balancer with container-native (NEG)
+# routing straight to API pods, on a reserved static IP.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: storytelling
+  namespace: storytelling
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "__STATIC_IP_NAME__"
+spec:
+  defaultBackend:
+    service:
+      name: storytelling-api
+      port:
+        number: 8000

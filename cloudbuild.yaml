@@ -1,0 +1,18 @@
+# Used by scripts/gcp/02-build.sh. Substitutions are supplied by the script.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file=Containerfile
+      - --tag=${_IMAGE}:${_TAG}
+      - .
+
+images:
+  - ${_IMAGE}:${_TAG}
+
+substitutions:
+  _IMAGE: ""
+  _TAG: ""
+
+options:
+  logging: CLOUD_LOGGING_ONLY

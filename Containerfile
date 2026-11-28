@@ -21,6 +21,8 @@ RUN python -m pip install --no-cache-dir --require-hashes \
     -r requirements.lock
 
 COPY --chown=appuser:appgroup app/ ./app/
+COPY --chown=appuser:appgroup alembic.ini ./alembic.ini
+COPY --chown=appuser:appgroup migrations/ ./migrations/
 
 USER 10001:10001
 

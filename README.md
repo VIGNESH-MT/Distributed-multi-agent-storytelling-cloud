@@ -856,6 +856,15 @@ The target deployment places independently running agent services across the two
 
 The complete distributed application rollout and agent placement remain deployment milestones. The existence of two Kubernetes nodes alone does not demonstrate that all agent services are independently deployed across both nodes.
 
+### 13.4 Google Cloud (GKE) deployment
+
+A second deployment target runs the same image on a regional, private-node GKE cluster inside a dedicated VPC, with Cloud SQL for PostgreSQL (private IP), Artifact Registry, a global load balancer, per-service HorizontalPodAutoscalers and Cloud Monitoring.
+
+- Manifests: `k8s/gke/`
+- Provisioning, build, deploy and teardown scripts: `scripts/gcp/`
+- Concurrency and throughput experiments: `scripts/load_test.py`
+- Step-by-step guide: [`docs/gcp-deployment.md`](docs/gcp-deployment.md)
+
 ## 14. Testing and Verification
 
 The project uses application-level automated tests and infrastructure-level verification.
